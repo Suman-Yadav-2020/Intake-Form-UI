@@ -73,6 +73,12 @@ const ChatApp = () => {
           ...prev,
           { role: "bot", content: data.next_question.question },
         ]);
+      } else {
+        alert("sdfsfsfd");
+        setMessages((prev) => [
+          ...prev,
+          { role: "bot", content: data.summary },
+        ]);
       }
     } catch (error) {
       console.error("Failed to fetch question", error);
@@ -102,7 +108,7 @@ const ChatApp = () => {
         ...prev,
         { role: "user", content: "[Signature submitted]" },
       ]);
-      // fetchNextQuestion(dataUrl);
+      fetchNextQuestion("[Signature submitted]");
       sigCanvas.current.clear();
       setShowSignature(false);
     }
