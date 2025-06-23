@@ -22,6 +22,7 @@ const ChatApp = () => {
   const [selectedOption, setSelectedOption] = useState("");
   const [selectedCheckboxes, setSelectedCheckboxes] = useState([]);
   const sigCanvas = useRef();
+  const [currentPhase, setCurrentPhase] = useState(null);
 
   const fetchFirstQuestion = async (userInitInput) => {
     try {
@@ -34,9 +35,11 @@ const ChatApp = () => {
       });
 
       const data = await res.json();
-
       if (data?.session_id) {
         localStorage.setItem("chat_session_id", data.session_id);
+      }
+      if (data?.current_phase) {
+        setCurrentPhase(data.current_phase); // 👈 Save phase
       }
 
       if (data?.next_question) {
@@ -57,24 +60,36 @@ const ChatApp = () => {
     const sessionId = localStorage.getItem("chat_session_id");
     if (!sessionId) return;
 
+    const url =
+      currentPhase === "clarification"
+        ? "http://localhost:8000/followup-step"
+        : "http://localhost:8000/next";
+
+    const payload =
+      currentPhase === "clarification"
+        ? { session_id: sessionId, question: currentQuestion?.question, answer }
+        : { session_id: sessionId, answer };
+
     try {
-      const res = await fetch("http://localhost:8000/next", {
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, answer }),
+        body: JSON.stringify(payload),
       });
+
       const data = await res.json();
+
       if (data?.next_question) {
         setCurrentQuestion(data.next_question);
-        setShowSignature(true);
-        setSelectedOption("");
-        setSelectedCheckboxes([]);
         setMessages((prev) => [
           ...prev,
           { role: "bot", content: data.next_question.question },
         ]);
-      } else {
-        alert("sdfsfsfd");
+
+        if (data?.current_phase) {
+          setCurrentPhase(data.current_phase); // 👈 keep tracking new phase
+        }
+      } else if (data?.summary) {
         setMessages((prev) => [
           ...prev,
           { role: "bot", content: data.summary },
