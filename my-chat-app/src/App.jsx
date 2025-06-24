@@ -26,8 +26,8 @@ const ChatApp = () => {
   const sigCanvas = useRef();
   const contentRef = useRef();
   const [currentPhase, setCurrentPhase] = useState(null);
-const [showError, setShowError] = useState(false);
-const [errorMessage, setErrorMessage] = useState("");
+// const [showError, setShowError] = useState(false);
+// const [errorMessage, setErrorMessage] = useState("");
 
 
   const fetchFirstQuestion = async (userInitInput) => {
@@ -80,8 +80,9 @@ const [errorMessage, setErrorMessage] = useState("");
 
       const data = await res.json();
 if (data?.error) {
-  setErrorMessage(data.error);
-  setShowError(true);
+  alert(data.error);
+  // setErrorMessage(data.error);
+  // setShowError(true);
 }
 
       if (data?.next_question) {
