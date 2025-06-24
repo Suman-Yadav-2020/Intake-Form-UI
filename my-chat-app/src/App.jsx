@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   TextField,
   Button,
@@ -9,9 +9,11 @@ import {
   Radio,
   Checkbox,
   FormGroup,
+  IconButton,
 } from "@mui/material";
 import { motion } from "framer-motion";
 import SignatureCanvas from "react-signature-canvas";
+import "./App.css"; // 👈 Your reference CSS
 
 const ChatApp = () => {
   const [messages, setMessages] = useState([]);
@@ -22,15 +24,17 @@ const ChatApp = () => {
   const [selectedOption, setSelectedOption] = useState("");
   const [selectedCheckboxes, setSelectedCheckboxes] = useState([]);
   const sigCanvas = useRef();
+  const contentRef = useRef();
   const [currentPhase, setCurrentPhase] = useState(null);
+const [showError, setShowError] = useState(false);
+const [errorMessage, setErrorMessage] = useState("");
+
 
   const fetchFirstQuestion = async (userInitInput) => {
     try {
       const res = await fetch("http://localhost:8000/load-form", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description: userInitInput }),
       });
 
@@ -38,10 +42,7 @@ const ChatApp = () => {
       if (data?.session_id) {
         localStorage.setItem("chat_session_id", data.session_id);
       }
-      if (data?.current_phase) {
-        setCurrentPhase(data.current_phase); // 👈 Save phase
-      }
-
+      if (data?.current_phase) setCurrentPhase(data.current_phase);
       if (data?.next_question) {
         setCurrentQuestion(data.next_question);
         setMessages((prev) => [
@@ -78,24 +79,25 @@ const ChatApp = () => {
       });
 
       const data = await res.json();
+if (data?.error) {
+  setErrorMessage(data.error);
+  setShowError(true);
+}
 
       if (data?.next_question) {
+        
         setCurrentQuestion(data.next_question);
         setMessages((prev) => [
           ...prev,
           { role: "bot", content: data.next_question.question },
         ]);
-
-        if (data?.current_phase) {
-          setCurrentPhase(data.current_phase); // 👈 keep tracking new phase
-        }
+        if (data?.current_phase) setCurrentPhase(data.current_phase);
       } else if (data?.summary) {
-        setMessages((prev) => [
-          ...prev,
-          { role: "bot", content: data.summary },
-        ]);
+        setMessages((prev) => [...prev, { role: "bot", content: data.summary }]);
       }
+     
     } catch (error) {
+      //  console.log(data);
       console.error("Failed to fetch question", error);
     }
   };
@@ -110,15 +112,13 @@ const ChatApp = () => {
       setMessages((prev) => [...prev, { role: "user", content: inputValue }]);
       fetchNextQuestion(inputValue);
     }
-
     setUserInput("");
+    setSelectedOption("");
+    setSelectedCheckboxes([]);
   };
 
   const handleSignatureSubmit = () => {
     if (sigCanvas.current) {
-      // const dataUrl = sigCanvas.current
-      //   .getTrimmedCanvas()
-      //   .toDataURL("image/png");
       setMessages((prev) => [
         ...prev,
         { role: "user", content: "[Signature submitted]" },
@@ -131,9 +131,7 @@ const ChatApp = () => {
 
   const handleCheckboxChange = (option) => {
     setSelectedCheckboxes((prev) =>
-      prev.includes(option)
-        ? prev.filter((item) => item !== option)
-        : [...prev, option]
+      prev.includes(option) ? prev.filter((item) => item !== option) : [...prev, option]
     );
   };
 
@@ -142,7 +140,18 @@ const ChatApp = () => {
       case "checkbox":
       case "multiselect":
         return (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          <>
+          <Snackbar
+  open={showError}
+  autoHideDuration={4000}
+  onClose={() => setShowError(false)}
+  anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+>
+  <Alert severity="error" onClose={() => setShowError(false)} sx={{ width: "100%" }}>
+    {errorMessage}
+  </Alert>
+</Snackbar>
+
             <FormGroup>
               {currentQuestion.options?.map((opt, idx) => (
                 <FormControlLabel
@@ -161,51 +170,24 @@ const ChatApp = () => {
               variant="contained"
               onClick={() => handleSend(selectedCheckboxes.join(", "))}
               disabled={selectedCheckboxes.length === 0}
-              sx={{
-                borderRadius: "30px",
-                px: 4,
-                py: 1.5,
-                textTransform: "none",
-              }}
+              className="send-btn"
             >
               Submit
             </Button>
-          </Box>
+          </>
         );
       case "signature":
         return (
           showSignature && (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                width: "100%",
-              }}
-            >
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
               <SignatureCanvas
                 ref={sigCanvas}
                 penColor="black"
-                canvasProps={{
-                  width: 500,
-                  height: 200,
-                  className: "sigCanvas",
-                }}
+                canvasProps={{ width: 500, height: 200, className: "sigCanvas" }}
                 backgroundColor="#fff"
                 style={{ border: "1px solid #ccc", borderRadius: "10px" }}
               />
-              <Button
-                variant="contained"
-                color="primary"
-                sx={{
-                  mt: 2,
-                  borderRadius: "30px",
-                  px: 4,
-                  py: 1.5,
-                  textTransform: "none",
-                }}
-                onClick={handleSignatureSubmit}
-              >
+              <Button variant="contained" onClick={handleSignatureSubmit} className="send-btn" sx={{ mt: 2 }}>
                 Submit Signature
               </Button>
             </Box>
@@ -213,145 +195,83 @@ const ChatApp = () => {
         );
       case "radio":
         return (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <RadioGroup
-              value={selectedOption}
-              onChange={(e) => setSelectedOption(e.target.value)}
-            >
+          <>
+            <RadioGroup value={selectedOption} onChange={(e) => setSelectedOption(e.target.value)}>
               {currentQuestion.options?.map((opt, idx) => (
-                <FormControlLabel
-                  key={idx}
-                  value={opt}
-                  control={<Radio />}
-                  label={opt}
-                />
+                <FormControlLabel key={idx} value={opt} control={<Radio />} label={opt} />
               ))}
             </RadioGroup>
             <Button
               variant="contained"
               onClick={() => handleSend(selectedOption)}
               disabled={!selectedOption}
-              sx={{
-                borderRadius: "30px",
-                px: 4,
-                py: 1.5,
-                textTransform: "none",
-              }}
+              className="send-btn"
             >
               Submit
             </Button>
-          </Box>
+          </>
         );
       default:
         return (
           <>
             <TextField
               fullWidth
-              type={currentQuestion?.type || "text"}
-              label="Your answer"
               variant="outlined"
+              placeholder="Type your answer..."
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: "30px",
-                  backgroundColor: "#f5f5f5",
-                  px: 2,
-                  py: 1,
-                  "& fieldset": {
-                    borderColor: "#ccc",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "#999",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "#1976d2",
-                  },
-                },
-              }}
+              className="input-message"
             />
-            <Button
-              variant="contained"
-              onClick={handleSend}
-              sx={{
-                borderRadius: "30px",
-                px: 3,
-                py: 1.5,
-                textTransform: "none",
-              }}
-            >
-              Send
-            </Button>
+            <button className="send-btn" onClick={handleSend}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+              </svg>
+            </button>
           </>
         );
     }
   };
 
-  return (
-    <Box
-      sx={{
-        height: "100vh",
-        width: "100vw",
-        display: "flex",
-        flexDirection: "column",
-        backgroundColor: "#f0f2f5",
-      }}
-    >
-      <Typography
-        variant="h4"
-        align="center"
-        sx={{ py: 2, backgroundColor: "#1976d2", color: "white" }}
-      >
-        Smart Intake Chatbot
-      </Typography>
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTop = contentRef.current.scrollHeight;
+    }
+  }, [messages]);
 
-      <Box
-        sx={{
-          flexGrow: 1,
-          overflowY: "auto",
-          px: 3,
-          py: 2,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {messages.map((msg, idx) => (
+  return (
+    <div className="chat-container active">
+      <div className="chat-header">
+        <div className="logo-section">
+          <div className="logo">A</div>
+          <div className="app-name">Attmosfire Chatbot</div>
+        </div>
+        <div className="header-icons">
+          <IconButton className="icon-btn">📎</IconButton>
+          <IconButton className="icon-btn">🎤</IconButton>
+        </div>
+      </div>
+
+      <div className="chat-content" ref={contentRef}>
+        <input className="input-field" placeholder="Do you have question?" readOnly />
+        {messages.map((msg, index) => (
           <motion.div
-            key={idx}
+            key={index}
+            className={`message ${msg.role === "bot" ? "support" : "user"}`}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            style={{
-              alignSelf: msg.role === "bot" ? "flex-start" : "flex-end",
-              maxWidth: "75%",
-              backgroundColor: msg.role === "bot" ? "#e1f5fe" : "#1976d2",
-              color: msg.role === "bot" ? "#000" : "#fff",
-              padding: "12px 16px",
-              borderRadius:
-                msg.role === "bot" ? "16px 16px 16px 0" : "16px 16px 0 16px",
-              marginBottom: "10px",
-              boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-            }}
+            transition={{ delay: index * 0.05, duration: 0.3 }}
           >
-            {msg.content}
+            <div className={`avatar ${msg.role === "bot" ? "support-avatar" : ""}`}>
+              {msg.role === "bot" ? "🤖" : "👤"}
+            </div>
+            <div className="message-bubble">{msg.content}</div>
           </motion.div>
         ))}
-      </Box>
+      </div>
 
-      <Box
-        sx={{
-          display: "flex",
-          gap: 2,
-          p: 2,
-          borderTop: "1px solid #ccc",
-          backgroundColor: "white",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {renderInputArea()}
-      </Box>
-    </Box>
+      <div className="chat-input">{renderInputArea()}</div>
+    </div>
   );
 };
 
