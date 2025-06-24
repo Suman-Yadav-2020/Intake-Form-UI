@@ -30,12 +30,12 @@ const ChatApp = () => {
 // const [errorMessage, setErrorMessage] = useState("");
 
 
-  const fetchFirstQuestion = async (userInitInput) => {
+  const fetchFirstQuestion = async (userInitInput ,voiceAnswer) => {
     try {
       const res = await fetch("http://localhost:8000/load-form", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: userInitInput }),
+        body: JSON.stringify({ description: userInitInput ,voice_description:voiceAnswer }),
       });
 
       const data = await res.json();
@@ -108,7 +108,7 @@ if (data?.error) {
     if (!inputValue.trim()) return;
 
     if (!sessionStarted) {
-      fetchFirstQuestion(inputValue);
+      fetchFirstQuestion(inputValue ,null);
     } else {
       setMessages((prev) => [...prev, { role: "user", content: inputValue }]);
       fetchNextQuestion(inputValue);
@@ -142,7 +142,7 @@ if (data?.error) {
       case "multiselect":
         return (
           <>
-          <Snackbar
+          {/* <Snackbar
   open={showError}
   autoHideDuration={4000}
   onClose={() => setShowError(false)}
@@ -151,7 +151,7 @@ if (data?.error) {
   <Alert severity="error" onClose={() => setShowError(false)} sx={{ width: "100%" }}>
     {errorMessage}
   </Alert>
-</Snackbar>
+</Snackbar> */}
 
             <FormGroup>
               {currentQuestion.options?.map((opt, idx) => (
@@ -248,8 +248,12 @@ if (data?.error) {
           <div className="app-name">Attmosfire Chatbot</div>
         </div>
         <div className="header-icons">
+        {!setSessionStarted && (
+          <>
           <IconButton className="icon-btn">📎</IconButton>
           <IconButton className="icon-btn">🎤</IconButton>
+          </>
+        )}
         </div>
       </div>
 
