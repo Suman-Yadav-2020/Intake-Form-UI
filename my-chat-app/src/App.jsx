@@ -1,357 +1,919 @@
-import React, { useState, useRef } from "react";
-import {
-  TextField,
-  Button,
-  Box,
-  Typography,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
-  Checkbox,
-  FormGroup,
-} from "@mui/material";
-import { motion } from "framer-motion";
-import SignatureCanvas from "react-signature-canvas";
+import React, { useState, useEffect, useRef } from "react";
+import "./App.css";
+import "./index.css";
+
+// Validation utility functions
+const ValidationUtils = {
+  email: (value) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!value) return "Email is required";
+    if (!emailRegex.test(value)) return "Please enter a valid email address";
+    return null;
+  },
+  
+  phone: (value) => {
+    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+    const cleanPhone = value.replace(/[\s\-\(\)\.]/g, '');
+    if (!value) return "Phone number is required";
+    if (cleanPhone.length < 10) return "Phone number must be at least 10 digits";
+    if (!phoneRegex.test(cleanPhone)) return "Please enter a valid phone number";
+    return null;
+  },
+  
+  zipcode: (value) => {
+    const zipRegex = /^\d{5}(-\d{4})?$/;
+    if (!value) return "Zip code is required";
+    if (!zipRegex.test(value)) return "Please enter a valid zip code (12345 or 12345-6789)";
+    return null;
+  },
+  
+  name: (value) => {
+    if (!value || value.trim().length === 0) return "Name is required";
+    if (value.trim().length < 2) return "Name must be at least 2 characters";
+    if (!/^[a-zA-Z\s\-\'\.]+$/.test(value)) return "Name can only contain letters, spaces, hyphens, and apostrophes";
+    return null;
+  },
+  
+  city: (value) => {
+    if (!value || value.trim().length === 0) return "City is required";
+    if (value.trim().length < 2) return "City name must be at least 2 characters";
+    if (!/^[a-zA-Z\s\-\'\.]+$/.test(value)) return "City name can only contain letters, spaces, hyphens, and apostrophes";
+    return null;
+  },
+  
+  date: (value) => {
+    if (!value) return "Date is required";
+    const selectedDate = new Date(value);
+    const today = new Date();
+    const minDate = new Date('1900-01-01');
+    
+    if (selectedDate > today) return "Date cannot be in the future";
+    if (selectedDate < minDate) return "Please enter a valid date";
+    return null;
+  },
+  
+  text: (value, minLength = 1, maxLength = 500) => {
+    if (!value || value.trim().length === 0) return "This field is required";
+    if (value.trim().length < minLength) return `Must be at least ${minLength} characters`;
+    if (value.trim().length > maxLength) return `Must be less than ${maxLength} characters`;
+    return null;
+  },
+  
+  number: (value, min = null, max = null) => {
+    if (!value) return "This field is required";
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return "Please enter a valid number";
+    if (min !== null && numValue < min) return `Value must be at least ${min}`;
+    if (max !== null && numValue > max) return `Value must be at most ${max}`;
+    return null;
+  }
+};
 
 const ChatApp = () => {
-  const [messages, setMessages] = useState([]);
-  const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [userInput, setUserInput] = useState("");
-  const [sessionStarted, setSessionStarted] = useState(false);
-  const [showSignature, setShowSignature] = useState(true);
-  const [selectedOption, setSelectedOption] = useState("");
-  const [selectedCheckboxes, setSelectedCheckboxes] = useState([]);
-  const sigCanvas = useRef();
-  const [currentPhase, setCurrentPhase] = useState(null);
+  const [isWidgetOpen, setIsWidgetOpen] = useState(false);
+  const [conversationMessages, setConversationMessages] = useState([]);
+  const [userTextInput, setUserTextInput] = useState("");
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [activeQuestion, setActiveQuestion] = useState(null);
+  const [conversationPhase, setConversationPhase] = useState(null);
+  const [userSelectedOption, setUserSelectedOption] = useState("");
+  const [userSelectedCheckboxes, setUserSelectedCheckboxes] = useState([]);
+  const [isSignatureVisible, setIsSignatureVisible] = useState(false);
+  const [shouldButtonPulse, setShouldButtonPulse] = useState(false);
+  const [isBotTyping, setIsBotTyping] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
+  const [isFormValid, setIsFormValid] = useState(false);
+  const chatMessagesRef = useRef(null);
+  const signaturePadRef = useRef();
 
-  const fetchFirstQuestion = async (userInitInput) => {
+  // Pulse animation for floating button
+  useEffect(() => {
+    const pulseInterval = setInterval(() => {
+      if (!isWidgetOpen) {
+        setShouldButtonPulse(true);
+        setTimeout(() => setShouldButtonPulse(false), 2000);
+      }
+    }, 8000);
+
+    return () => clearInterval(pulseInterval);
+  }, [isWidgetOpen]);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatMessagesRef.current) {
+      chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
+    }
+  }, [conversationMessages]);
+
+  const toggleChatWidget = () => setIsWidgetOpen(!isWidgetOpen);
+
+  // Validation functions
+  const validateInput = (value, type, fieldName) => {
+    let error = null;
+    
+    switch (type) {
+      case 'email':
+        error = ValidationUtils.email(value);
+        break;
+      case 'phone':
+        error = ValidationUtils.phone(value);
+        break;
+      case 'zipcode':
+        error = ValidationUtils.zipcode(value);
+        break;
+      case 'name':
+        error = ValidationUtils.name(value);
+        break;
+      case 'city':
+        error = ValidationUtils.city(value);
+        break;
+      case 'date':
+        error = ValidationUtils.date(value);
+        break;
+      case 'number':
+        error = ValidationUtils.number(value);
+        break;
+      case 'text':
+      default:
+        error = ValidationUtils.text(value);
+        break;
+    }
+    
+    setValidationErrors(prev => ({
+      ...prev,
+      [fieldName]: error
+    }));
+    
+    return !error;
+  };
+
+  const validateRadioSelection = () => {
+    if (!userSelectedOption) {
+      setValidationErrors(prev => ({
+        ...prev,
+        radio: "Please select an option"
+      }));
+      return false;
+    }
+    
+    setValidationErrors(prev => ({
+      ...prev,
+      radio: null
+    }));
+    return true;
+  };
+
+  const validateCheckboxSelection = (minRequired = 1) => {
+    if (userSelectedCheckboxes.length < minRequired) {
+      setValidationErrors(prev => ({
+        ...prev,
+        checkbox: `Please select at least ${minRequired} option${minRequired > 1 ? 's' : ''}`
+      }));
+      return false;
+    }
+    
+    setValidationErrors(prev => ({
+      ...prev,
+      checkbox: null
+    }));
+    return true;
+  };
+
+  const clearValidationErrors = () => {
+    setValidationErrors({});
+  };
+
+  // Simulate bot typing indicator
+  const showTypingIndicator = () => {
+    setIsBotTyping(true);
+  };
+
+  // API call to start new session
+  const initializeSession = async (userDescription) => {
+    showTypingIndicator();
+    
     try {
-      const res = await fetch("http://localhost:8000/load-form", {
+      const response = await fetch("http://localhost:8000/load-form", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ description: userInitInput }),
+        body: JSON.stringify({ description: userDescription }),
       });
 
-      const data = await res.json();
-      if (data?.session_id) {
-        localStorage.setItem("chat_session_id", data.session_id);
+      const responseData = await response.json();
+      setIsBotTyping(false);
+      
+      if (responseData?.session_id) {
+        // Store session in memory instead of localStorage
+        window.legalChatSessionId = responseData.session_id;
       }
-      if (data?.current_phase) {
-        setCurrentPhase(data.current_phase); // 👈 Save phase
+      if (responseData?.current_phase) {
+        setConversationPhase(responseData.current_phase);
       }
 
-      if (data?.next_question) {
-        setCurrentQuestion(data.next_question);
-        setMessages((prev) => [
-          ...prev,
-          { role: "user", content: userInitInput },
-          { role: "bot", content: data.next_question.question },
+      if (responseData?.next_question) {
+        setActiveQuestion(responseData.next_question);
+        setConversationMessages((prevMessages) => [
+          ...prevMessages,
+          { role: "user", content: userDescription, avatar: "👤" },
+          { role: "bot", content: responseData.next_question.question, avatar: "🤖" },
         ]);
-        setSessionStarted(true);
+        setIsSessionActive(true);
+        
+        // Handle signature type
+        if (responseData.next_question.type === "signature") {
+          setIsSignatureVisible(true);
+        }
       }
     } catch (error) {
-      console.error("Failed to start session", error);
+      setIsBotTyping(false);
+      console.error("Failed to initialize session", error);
+      setConversationMessages((prevMessages) => [
+        ...prevMessages,
+        { role: "user", content: userDescription, avatar: "👤" },
+        { role: "bot", content: "Sorry, I'm having trouble connecting. Please try again later.", avatar: "🤖" },
+      ]);
     }
   };
 
-  const fetchNextQuestion = async (answer = null) => {
-    const sessionId = localStorage.getItem("chat_session_id");
+  // API call to get next question
+  const fetchNextQuestion = async (userAnswer = null) => {
+    const sessionId = window.legalChatSessionId;
     if (!sessionId) return;
 
-    const url =
-      currentPhase === "clarification"
+    showTypingIndicator();
+
+    const apiEndpoint =
+      conversationPhase === "clarification"
         ? "http://localhost:8000/followup-step"
         : "http://localhost:8000/next";
 
-    const payload =
-      currentPhase === "clarification"
-        ? { session_id: sessionId, question: currentQuestion?.question, answer }
-        : { session_id: sessionId, answer };
+    const requestPayload =
+      conversationPhase === "clarification"
+        ? { session_id: sessionId, question: activeQuestion?.question, answer: userAnswer }
+        : { session_id: sessionId, answer: userAnswer };
 
     try {
-      const res = await fetch(url, {
+      const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(requestPayload),
       });
 
-      const data = await res.json();
+      const responseData = await response.json();
+      setIsBotTyping(false);
 
-      if (data?.next_question) {
-        setCurrentQuestion(data.next_question);
-        setMessages((prev) => [
-          ...prev,
-          { role: "bot", content: data.next_question.question },
+      if (responseData?.next_question) {
+        setActiveQuestion(responseData.next_question);
+        setConversationMessages((prevMessages) => [
+          ...prevMessages,
+          { role: "bot", content: responseData.next_question.question, avatar: "🤖" },
         ]);
 
-        if (data?.current_phase) {
-          setCurrentPhase(data.current_phase); // 👈 keep tracking new phase
+        if (responseData?.current_phase) {
+          setConversationPhase(responseData.current_phase);
         }
-      } else if (data?.summary) {
-        setMessages((prev) => [
-          ...prev,
-          { role: "bot", content: data.summary },
+        
+        // Handle signature type
+        if (responseData.next_question.type === "signature") {
+          setIsSignatureVisible(true);
+        }
+      } else if (responseData?.summary) {
+        setConversationMessages((prevMessages) => [
+          ...prevMessages,
+          { role: "bot", content: responseData.summary, avatar: "🤖" },
         ]);
+        setActiveQuestion(null);
       }
     } catch (error) {
-      console.error("Failed to fetch question", error);
-    }
-  };
-
-  const handleSend = (value) => {
-    const inputValue = typeof value === "string" ? value : userInput;
-    if (!inputValue.trim()) return;
-
-    if (!sessionStarted) {
-      fetchFirstQuestion(inputValue);
-    } else {
-      setMessages((prev) => [...prev, { role: "user", content: inputValue }]);
-      fetchNextQuestion(inputValue);
-    }
-
-    setUserInput("");
-  };
-
-  const handleSignatureSubmit = () => {
-    if (sigCanvas.current) {
-      // const dataUrl = sigCanvas.current
-      //   .getTrimmedCanvas()
-      //   .toDataURL("image/png");
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", content: "[Signature submitted]" },
+      setIsBotTyping(false);
+      console.error("Failed to fetch next question", error);
+      setConversationMessages((prevMessages) => [
+        ...prevMessages,
+        { role: "bot", content: "Sorry, I encountered an error. Please try again.", avatar: "🤖" },
       ]);
-      fetchNextQuestion("[Signature submitted]");
-      sigCanvas.current.clear();
-      setShowSignature(false);
     }
   };
 
-  const handleCheckboxChange = (option) => {
-    setSelectedCheckboxes((prev) =>
-      prev.includes(option)
-        ? prev.filter((item) => item !== option)
-        : [...prev, option]
+  const handleUserSubmission = (inputValue) => {
+    const messageContent = typeof inputValue === "string" ? inputValue : userTextInput;
+    
+    // Validation based on current question type
+    if (activeQuestion) {
+      let isValid = true;
+      
+      switch (activeQuestion.type) {
+        case 'radio':
+          isValid = validateRadioSelection();
+          break;
+        case 'checkbox':
+        case 'multiselect':
+          isValid = validateCheckboxSelection(activeQuestion.minRequired || 1);
+          break;
+        case 'email':
+          isValid = validateInput(messageContent, 'email', 'input');
+          break;
+        case 'phone':
+          isValid = validateInput(messageContent, 'phone', 'input');
+          break;
+        case 'zipcode':
+          isValid = validateInput(messageContent, 'zipcode', 'input');
+          break;
+        case 'name':
+          isValid = validateInput(messageContent, 'name', 'input');
+          break;
+        case 'city':
+          isValid = validateInput(messageContent, 'city', 'input');
+          break;
+        case 'date':
+          isValid = validateInput(messageContent, 'date', 'input');
+          break;
+        case 'number':
+          isValid = validateInput(messageContent, 'number', 'input');
+          break;
+        default:
+          isValid = validateInput(messageContent, 'text', 'input');
+          break;
+      }
+      
+      if (!isValid) {
+        return; // Stop submission if validation fails
+      }
+    } else {
+      // Initial message validation
+      if (!validateInput(messageContent, 'text', 'input')) {
+        return;
+      }
+    }
+
+    if (!messageContent.trim() && !inputValue) return;
+
+    // Clear validation errors on successful submission
+    clearValidationErrors();
+
+    if (!isSessionActive) {
+      initializeSession(messageContent);
+    } else {
+      setConversationMessages((prevMessages) => [...prevMessages, { role: "user", content: messageContent, avatar: "👤" }]);
+      fetchNextQuestion(messageContent);
+    }
+    setUserTextInput("");
+    setUserSelectedOption("");
+    setUserSelectedCheckboxes([]);
+  };
+
+  const handleCheckboxSelection = (optionValue) => {
+    setUserSelectedCheckboxes((prevSelected) =>
+      prevSelected.includes(optionValue) 
+        ? prevSelected.filter((value) => value !== optionValue) 
+        : [...prevSelected, optionValue]
+    );
+    
+    // Clear checkbox validation error when user makes a selection
+    if (validationErrors.checkbox) {
+      setValidationErrors(prev => ({
+        ...prev,
+        checkbox: null
+      }));
+    }
+  };
+
+  const handleSignatureSubmission = () => {
+    setConversationMessages((prevMessages) => [
+      ...prevMessages,
+      { role: "user", content: "✅ Signature submitted", avatar: "👤" },
+    ]);
+    fetchNextQuestion("[Signature submitted]");
+    setIsSignatureVisible(false);
+  };
+
+  const handleInputKeyPress = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleUserSubmission();
+    }
+  };
+
+  const handleInputChange = (event) => {
+    const value = event.target.value;
+    setUserTextInput(value);
+    
+    // Clear validation error when user starts typing
+    if (validationErrors.input) {
+      setValidationErrors(prev => ({
+        ...prev,
+        input: null
+      }));
+    }
+  };
+
+  const handleRadioChange = (event) => {
+    setUserSelectedOption(event.target.value);
+    
+    // Clear radio validation error when user makes a selection
+    if (validationErrors.radio) {
+      setValidationErrors(prev => ({
+        ...prev,
+        radio: null
+      }));
+    }
+  };
+
+  // Digital signature canvas component
+  const DigitalSignaturePad = () => {
+    const canvasRef = useRef(null);
+    const [isDrawing, setIsDrawing] = useState(false);
+
+    const startDrawing = (event) => {
+      setIsDrawing(true);
+      const canvas = canvasRef.current;
+      const canvasRect = canvas.getBoundingClientRect();
+      const xPosition = event.clientX - canvasRect.left;
+      const yPosition = event.clientY - canvasRect.top;
+      
+      const canvasContext = canvas.getContext('2d');
+      canvasContext.beginPath();
+      canvasContext.moveTo(xPosition, yPosition);
+    };
+
+    const drawOnCanvas = (event) => {
+      if (!isDrawing) return;
+      
+      const canvas = canvasRef.current;
+      const canvasRect = canvas.getBoundingClientRect();
+      const xPosition = event.clientX - canvasRect.left;
+      const yPosition = event.clientY - canvasRect.top;
+      
+      const canvasContext = canvas.getContext('2d');
+      canvasContext.lineTo(xPosition, yPosition);
+      canvasContext.stroke();
+    };
+
+    const stopDrawing = () => {
+      setIsDrawing(false);
+    };
+
+    const clearSignature = () => {
+      const canvas = canvasRef.current;
+      const canvasContext = canvas.getContext('2d');
+      canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+    };
+
+    return (
+      <div className="signature-canvas-container">
+        <canvas
+          ref={canvasRef}
+          width={300}
+          height={120}
+          className="signature-canvas"
+          onMouseDown={startDrawing}
+          onMouseMove={drawOnCanvas}
+          onMouseUp={stopDrawing}
+          onMouseLeave={stopDrawing}
+        />
+        <button
+          onClick={clearSignature}
+          className="signature-clear-button"
+        >
+          Clear
+        </button>
+      </div>
     );
   };
 
-  const renderInputArea = () => {
-    switch (currentQuestion?.type) {
+  const renderInputInterface = () => {
+    if (!activeQuestion) {
+      return (
+        <div className="text-input-container">
+          <div className="input-wrapper">
+            <input
+              value={userTextInput}
+              onChange={handleInputChange}
+              onKeyPress={handleInputKeyPress}
+              placeholder="Describe what you need help with..."
+              className={`chat-text-input ${validationErrors.input ? 'chat-text-input--error' : ''}`}
+            />
+            {validationErrors.input && (
+              <div className="validation-error">{validationErrors.input}</div>
+            )}
+          </div>
+          <button
+            onClick={handleUserSubmission}
+            className="chat-send-button"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+            </svg>
+          </button>
+        </div>
+      );
+    }
+
+    switch (activeQuestion.type) {
+      case "radio":
+        return (
+          <div className="question-options-container">
+            <div className="question-options-list">
+              {activeQuestion.options?.map((optionValue, optionIndex) => (
+                <label
+                  key={optionIndex}
+                  className={`question-option-label ${
+                    userSelectedOption === optionValue ? 'question-option-label--selected' : ''
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="question-option"
+                    value={optionValue}
+                    checked={userSelectedOption === optionValue}
+                    onChange={handleRadioChange}
+                    className="question-radio-input"
+                  />
+                  <span className="question-option-text">{optionValue}</span>
+                </label>
+              ))}
+            </div>
+            {validationErrors.radio && (
+              <div className="validation-error">{validationErrors.radio}</div>
+            )}
+            <button
+              className="question-submit-button"
+              onClick={() => handleUserSubmission(userSelectedOption)}
+            >
+              Continue
+            </button>
+          </div>
+        );
+
       case "checkbox":
       case "multiselect":
         return (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <FormGroup>
-              {currentQuestion.options?.map((opt, idx) => (
-                <FormControlLabel
-                  key={idx}
-                  control={
-                    <Checkbox
-                      checked={selectedCheckboxes.includes(opt)}
-                      onChange={() => handleCheckboxChange(opt)}
-                    />
-                  }
-                  label={opt}
-                />
+          <div className="question-options-container">
+            <div className="question-options-list">
+              {activeQuestion.options?.map((optionValue, optionIndex) => (
+                <label
+                  key={optionIndex}
+                  className={`question-option-label ${
+                    userSelectedCheckboxes.includes(optionValue) ? 'question-option-label--selected' : ''
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    value={optionValue}
+                    checked={userSelectedCheckboxes.includes(optionValue)}
+                    onChange={() => handleCheckboxSelection(optionValue)}
+                    className="question-checkbox-input"
+                  />
+                  <span className="question-option-text">{optionValue}</span>
+                </label>
               ))}
-            </FormGroup>
-            <Button
-              variant="contained"
-              onClick={() => handleSend(selectedCheckboxes.join(", "))}
-              disabled={selectedCheckboxes.length === 0}
-              sx={{
-                borderRadius: "30px",
-                px: 4,
-                py: 1.5,
-                textTransform: "none",
-              }}
+            </div>
+            {validationErrors.checkbox && (
+              <div className="validation-error">{validationErrors.checkbox}</div>
+            )}
+            <button
+              className="question-submit-button"
+              onClick={() => handleUserSubmission(userSelectedCheckboxes.join(", "))}
             >
-              Submit
-            </Button>
-          </Box>
+              Continue ({userSelectedCheckboxes.length} selected)
+            </button>
+          </div>
         );
+
       case "signature":
         return (
-          showSignature && (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                width: "100%",
-              }}
-            >
-              <SignatureCanvas
-                ref={sigCanvas}
-                penColor="black"
-                canvasProps={{
-                  width: 500,
-                  height: 200,
-                  className: "sigCanvas",
-                }}
-                backgroundColor="#fff"
-                style={{ border: "1px solid #ccc", borderRadius: "10px" }}
-              />
-              <Button
-                variant="contained"
-                color="primary"
-                sx={{
-                  mt: 2,
-                  borderRadius: "30px",
-                  px: 4,
-                  py: 1.5,
-                  textTransform: "none",
-                }}
-                onClick={handleSignatureSubmit}
+          isSignatureVisible && (
+            <div className="signature-input-container">
+              <div className="signature-input-box">
+                <p className="signature-input-label">Please sign below:</p>
+                <DigitalSignaturePad />
+              </div>
+              <button
+                className="question-submit-button"
+                onClick={handleSignatureSubmission}
               >
                 Submit Signature
-              </Button>
-            </Box>
+              </button>
+            </div>
           )
         );
-      case "radio":
+
+      case "email":
         return (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <RadioGroup
-              value={selectedOption}
-              onChange={(e) => setSelectedOption(e.target.value)}
+          <div className="text-input-container">
+            <div className="input-wrapper">
+              <input
+                value={userTextInput}
+                onChange={handleInputChange}
+                onKeyPress={handleInputKeyPress}
+                placeholder="Enter your email address..."
+                className={`chat-text-input ${validationErrors.input ? 'chat-text-input--error' : ''}`}
+                type="email"
+              />
+              {validationErrors.input && (
+                <div className="validation-error">{validationErrors.input}</div>
+              )}
+            </div>
+            <button
+              onClick={handleUserSubmission}
+              className="chat-send-button"
             >
-              {currentQuestion.options?.map((opt, idx) => (
-                <FormControlLabel
-                  key={idx}
-                  value={opt}
-                  control={<Radio />}
-                  label={opt}
-                />
-              ))}
-            </RadioGroup>
-            <Button
-              variant="contained"
-              onClick={() => handleSend(selectedOption)}
-              disabled={!selectedOption}
-              sx={{
-                borderRadius: "30px",
-                px: 4,
-                py: 1.5,
-                textTransform: "none",
-              }}
-            >
-              Submit
-            </Button>
-          </Box>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+              </svg>
+            </button>
+          </div>
         );
+
+      case "phone":
+        return (
+          <div className="text-input-container">
+            <div className="input-wrapper">
+              <input
+                value={userTextInput}
+                onChange={handleInputChange}
+                onKeyPress={handleInputKeyPress}
+                placeholder="Enter your phone number..."
+                className={`chat-text-input ${validationErrors.input ? 'chat-text-input--error' : ''}`}
+                type="tel"
+              />
+              {validationErrors.input && (
+                <div className="validation-error">{validationErrors.input}</div>
+              )}
+            </div>
+            <button
+              onClick={handleUserSubmission}
+              className="chat-send-button"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+              </svg>
+            </button>
+          </div>
+        );
+
+      case "zipcode":
+        return (
+          <div className="text-input-container">
+            <div className="input-wrapper">
+              <input
+                value={userTextInput}
+                onChange={handleInputChange}
+                onKeyPress={handleInputKeyPress}
+                placeholder="Enter zip code (12345 or 12345-6789)..."
+                className={`chat-text-input ${validationErrors.input ? 'chat-text-input--error' : ''}`}
+                type="text"
+              />
+              {validationErrors.input && (
+                <div className="validation-error">{validationErrors.input}</div>
+              )}
+            </div>
+            <button
+              onClick={handleUserSubmission}
+              className="chat-send-button"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+              </svg>
+            </button>
+          </div>
+        );
+
+      case "name":
+        return (
+          <div className="text-input-container">
+            <div className="input-wrapper">
+              <input
+                value={userTextInput}
+                onChange={handleInputChange}
+                onKeyPress={handleInputKeyPress}
+                placeholder="Enter your full name..."
+                className={`chat-text-input ${validationErrors.input ? 'chat-text-input--error' : ''}`}
+                type="text"
+              />
+              {validationErrors.input && (
+                <div className="validation-error">{validationErrors.input}</div>
+              )}
+            </div>
+            <button
+              onClick={handleUserSubmission}
+              className="chat-send-button"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+              </svg>
+            </button>
+          </div>
+        );
+
+      case "city":
+        return (
+          <div className="text-input-container">
+            <div className="input-wrapper">
+              <input
+                value={userTextInput}
+                onChange={handleInputChange}
+                onKeyPress={handleInputKeyPress}
+                placeholder="Enter your city..."
+                className={`chat-text-input ${validationErrors.input ? 'chat-text-input--error' : ''}`}
+                type="text"
+              />
+              {validationErrors.input && (
+                <div className="validation-error">{validationErrors.input}</div>
+              )}
+            </div>
+            <button
+              onClick={handleUserSubmission}
+              className="chat-send-button"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+              </svg>
+            </button>
+          </div>
+        );
+
+      case "date":
+        return (
+          <div className="text-input-container">
+            <div className="input-wrapper">
+              <input
+                value={userTextInput}
+                onChange={handleInputChange}
+                onKeyPress={handleInputKeyPress}
+                placeholder="Select date..."
+                className={`chat-text-input ${validationErrors.input ? 'chat-text-input--error' : ''}`}
+                type="date"
+                max={new Date().toISOString().split('T')[0]}
+              />
+              {validationErrors.input && (
+                <div className="validation-error">{validationErrors.input}</div>
+              )}
+            </div>
+            <button
+              onClick={handleUserSubmission}
+              className="chat-send-button"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+              </svg>
+            </button>
+          </div>
+        );
+
+      case "number":
+        return (
+          <div className="text-input-container">
+            <div className="input-wrapper">
+              <input
+                value={userTextInput}
+                onChange={handleInputChange}
+                onKeyPress={handleInputKeyPress}
+                placeholder="Enter a number..."
+                className={`chat-text-input ${validationErrors.input ? 'chat-text-input--error' : ''}`}
+                type="number"
+                min={activeQuestion.min || undefined}
+                max={activeQuestion.max || undefined}
+              />
+              {validationErrors.input && (
+                <div className="validation-error">{validationErrors.input}</div>
+              )}
+            </div>
+            <button
+              onClick={handleUserSubmission}
+              className="chat-send-button"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+              </svg>
+            </button>
+          </div>
+        );
+
       default:
         return (
-          <>
-            <TextField
-              fullWidth
-              type={currentQuestion?.type || "text"}
-              label="Your answer"
-              variant="outlined"
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: "30px",
-                  backgroundColor: "#f5f5f5",
-                  px: 2,
-                  py: 1,
-                  "& fieldset": {
-                    borderColor: "#ccc",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "#999",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "#1976d2",
-                  },
-                },
-              }}
-            />
-            <Button
-              variant="contained"
-              onClick={handleSend}
-              sx={{
-                borderRadius: "30px",
-                px: 3,
-                py: 1.5,
-                textTransform: "none",
-              }}
+          <div className="text-input-container">
+            <div className="input-wrapper">
+              <input
+                value={userTextInput}
+                onChange={handleInputChange}
+                onKeyPress={handleInputKeyPress}
+                placeholder="Type your answer..."
+                className={`chat-text-input ${validationErrors.input ? 'chat-text-input--error' : ''}`}
+                type={activeQuestion?.type || "text"}
+              />
+              {validationErrors.input && (
+                <div className="validation-error">{validationErrors.input}</div>
+              )}
+            </div>
+            <button
+              onClick={handleUserSubmission}
+              className="chat-send-button"
             >
-              Send
-            </Button>
-          </>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+              </svg>
+            </button>
+          </div>
         );
     }
   };
 
   return (
-    <Box
-      sx={{
-        height: "100vh",
-        width: "100vw",
-        display: "flex",
-        flexDirection: "column",
-        backgroundColor: "#f0f2f5",
-      }}
-    >
-      <Typography
-        variant="h4"
-        align="center"
-        sx={{ py: 2, backgroundColor: "#1976d2", color: "white" }}
+    <div className="legal-intake-container">
+      {/* Floating Chat Button */}
+      <button
+        onClick={toggleChatWidget}
+        className={`floating-chat-button ${
+          isWidgetOpen ? 'floating-chat-button--open' : 'floating-chat-button--closed'
+        } ${shouldButtonPulse ? 'floating-chat-button--pulse' : ''}`}
       >
-        Smart Intake Chatbot
-      </Typography>
+        {isWidgetOpen ? '✕' : '🤖'}
+      </button>
 
-      <Box
-        sx={{
-          flexGrow: 1,
-          overflowY: "auto",
-          px: 3,
-          py: 2,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {messages.map((msg, idx) => (
-          <motion.div
-            key={idx}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            style={{
-              alignSelf: msg.role === "bot" ? "flex-start" : "flex-end",
-              maxWidth: "75%",
-              backgroundColor: msg.role === "bot" ? "#e1f5fe" : "#1976d2",
-              color: msg.role === "bot" ? "#000" : "#fff",
-              padding: "12px 16px",
-              borderRadius:
-                msg.role === "bot" ? "16px 16px 16px 0" : "16px 16px 0 16px",
-              marginBottom: "10px",
-              boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-            }}
-          >
-            {msg.content}
-          </motion.div>
-        ))}
-      </Box>
+      {/* Chat Widget */}
+      <div className={`legal-chat-widget ${isWidgetOpen ? 'legal-chat-widget--open' : 'legal-chat-widget--closed'}`}>
+        {/* Header Section */}
+        <div className="chat-widget-header">
+          <div className="chat-header-content">
+            <div className="chat-header-left">
+              <div className="chat-header-icon">🤖</div>
+              <div>
+                <div className="chat-header-title">Smart Intake Bot</div>
+                <div className="chat-header-subtitle">AI-powered assistance</div>
+              </div>
+            </div>
+            <div className="chat-header-right">
+             
+              <div className="online-status-indicator"></div>
+              <span className="online-status-text">Online</span>
+               <button class="icon-btn">🎤</button>
+            </div>
+          </div>
+        </div>
 
-      <Box
-        sx={{
-          display: "flex",
-          gap: 2,
-          p: 2,
-          borderTop: "1px solid #ccc",
-          backgroundColor: "white",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {renderInputArea()}
-      </Box>
-    </Box>
+        {/* Messages Area */}
+        <div ref={chatMessagesRef} className="legal-chat-messages">
+          {/* Welcome Message */}
+          {conversationMessages.length === 0 && (
+            <div className="chat-message-container">
+              <div className="message-avatar message-avatar--bot">🤖</div>
+              <div className="message-bubble message-bubble--bot">
+                👋 Hello! I'm your Smart Intake Bot. I can help you with legal consultations, document reviews, and more. What can I assist you with today?
+              </div>
+            </div>
+          )}
+
+          {/* Conversation Messages */}
+          {conversationMessages.map((message, messageIndex) => (
+            <div
+              key={messageIndex}
+              className={message.role === 'user' ? 'chat-message-container--user' : 'chat-message-container'}
+            >
+              <div className={`message-avatar ${
+                message.role === 'user' ? 'message-avatar--user' : 'message-avatar--bot'
+              }`}>
+                {message.avatar || (message.role === 'user' ? '👤' : '🤖')}
+              </div>
+              <div className={`message-bubble ${
+                message.role === 'user' ? 'message-bubble--user' : 'message-bubble--bot'
+              }`}>
+                {message.content}
+              </div>
+            </div>
+          ))}
+
+          {/* Typing Indicator */}
+          {isBotTyping && (
+            <div className="typing-indicator-container">
+              <div className="message-avatar message-avatar--bot">🤖</div>
+              <div className="typing-indicator-bubble">
+                <div className="typing-dots">
+                  <div className="typing-dot"></div>
+                  <div className="typing-dot"></div>
+                  <div className="typing-dot"></div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Input Area */}
+        <div className="chat-input-area">
+          {renderInputInterface()}
+        </div>
+      </div>
+    </div>
   );
 };
 
