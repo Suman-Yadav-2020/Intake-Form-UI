@@ -26,6 +26,9 @@ const ChatApp = () => {
   const sigCanvas = useRef();
   const contentRef = useRef();
   const [currentPhase, setCurrentPhase] = useState(null);
+const [showError, setShowError] = useState(false);
+const [errorMessage, setErrorMessage] = useState("");
+
 
   const fetchFirstQuestion = async (userInitInput) => {
     try {
@@ -76,8 +79,13 @@ const ChatApp = () => {
       });
 
       const data = await res.json();
+if (data?.error) {
+  setErrorMessage(data.error);
+  setShowError(true);
+}
 
       if (data?.next_question) {
+        
         setCurrentQuestion(data.next_question);
         setMessages((prev) => [
           ...prev,
@@ -87,7 +95,9 @@ const ChatApp = () => {
       } else if (data?.summary) {
         setMessages((prev) => [...prev, { role: "bot", content: data.summary }]);
       }
+     
     } catch (error) {
+      //  console.log(data);
       console.error("Failed to fetch question", error);
     }
   };
@@ -131,6 +141,17 @@ const ChatApp = () => {
       case "multiselect":
         return (
           <>
+          <Snackbar
+  open={showError}
+  autoHideDuration={4000}
+  onClose={() => setShowError(false)}
+  anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+>
+  <Alert severity="error" onClose={() => setShowError(false)} sx={{ width: "100%" }}>
+    {errorMessage}
+  </Alert>
+</Snackbar>
+
             <FormGroup>
               {currentQuestion.options?.map((opt, idx) => (
                 <FormControlLabel
