@@ -14,6 +14,8 @@ import {
 import { motion } from "framer-motion";
 import SignatureCanvas from "react-signature-canvas";
 import "./App.css"; // 👈 Your reference CSS
+import VoiceRecorder from "./VoiceRecorder";
+import RecordRTC from "recordrtc";
 
 const ChatApp = () => {
   const [messages, setMessages] = useState([]);
@@ -26,16 +28,69 @@ const ChatApp = () => {
   const sigCanvas = useRef();
   const contentRef = useRef();
   const [currentPhase, setCurrentPhase] = useState(null);
-// const [showError, setShowError] = useState(false);
-// const [errorMessage, setErrorMessage] = useState("");
+  const [showRecorder, setShowRecorder] = useState(false);
+  // const [showError, setShowError] = useState(false);
+  // const [errorMessage, setErrorMessage] = useState("");
 
+  const [isRecording, setIsRecording] = useState(false);
+  const recorderRef = useRef(null);
+  const streamRef = useRef(null);
 
-  const fetchFirstQuestion = async (userInitInput ,voiceAnswer) => {
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      recorderRef.current = new RecordRTC(stream, {
+        type: "audio",
+        mimeType: "audio/wav",
+        recorderType: RecordRTC.StereoAudioRecorder,
+        desiredSampRate: 16000,
+      });
+
+      recorderRef.current.startRecording();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Microphone access error:", err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (!recorderRef.current) return;
+
+    recorderRef.current.stopRecording(() => {
+      const blob = recorderRef.current.getBlob();
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      setIsRecording(false);
+
+      const audioURL = URL.createObjectURL(blob);
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = () => {
+        const base64Audio = reader.result.split(",")[1];
+
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", type: "audio", audioUrl: audioURL },
+        ]);
+
+        fetchFirstQuestion(null, base64Audio);
+      };
+    });
+  };
+
+  const fetchFirstQuestion = async (
+    userInitInput = null,
+    voiceAnswer = null
+  ) => {
     try {
       const res = await fetch("http://localhost:8000/load-form", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: userInitInput ,voice_description:voiceAnswer }),
+        body: JSON.stringify({
+          description: userInitInput,
+          voice_description: voiceAnswer,
+        }),
       });
 
       const data = await res.json();
@@ -44,12 +99,22 @@ const ChatApp = () => {
       }
       if (data?.current_phase) setCurrentPhase(data.current_phase);
       if (data?.next_question) {
+        // If user typed input
+        if (userInitInput) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "user", content: userInitInput },
+            { role: "bot", content: data.next_question.question },
+          ]);
+        } else {
+          // Voice message was already added earlier, only add bot response
+          setMessages((prev) => [
+            ...prev,
+            { role: "bot", content: data.next_question.question },
+          ]);
+        }
+
         setCurrentQuestion(data.next_question);
-        setMessages((prev) => [
-          ...prev,
-          { role: "user", content: userInitInput },
-          { role: "bot", content: data.next_question.question },
-        ]);
         setSessionStarted(true);
       }
     } catch (error) {
@@ -79,14 +144,13 @@ const ChatApp = () => {
       });
 
       const data = await res.json();
-if (data?.error) {
-  alert(data.error);
-  // setErrorMessage(data.error);
-  // setShowError(true);
-}
+      if (data?.error) {
+        alert(data.error);
+        // setErrorMessage(data.error);
+        // setShowError(true);
+      }
 
       if (data?.next_question) {
-        
         setCurrentQuestion(data.next_question);
         setMessages((prev) => [
           ...prev,
@@ -94,9 +158,11 @@ if (data?.error) {
         ]);
         if (data?.current_phase) setCurrentPhase(data.current_phase);
       } else if (data?.summary) {
-        setMessages((prev) => [...prev, { role: "bot", content: data.summary }]);
+        setMessages((prev) => [
+          ...prev,
+          { role: "bot", content: data.summary },
+        ]);
       }
-     
     } catch (error) {
       //  console.log(data);
       console.error("Failed to fetch question", error);
@@ -108,7 +174,7 @@ if (data?.error) {
     if (!inputValue.trim()) return;
 
     if (!sessionStarted) {
-      fetchFirstQuestion(inputValue ,null);
+      fetchFirstQuestion(inputValue, null);
     } else {
       setMessages((prev) => [...prev, { role: "user", content: inputValue }]);
       fetchNextQuestion(inputValue);
@@ -132,7 +198,9 @@ if (data?.error) {
 
   const handleCheckboxChange = (option) => {
     setSelectedCheckboxes((prev) =>
-      prev.includes(option) ? prev.filter((item) => item !== option) : [...prev, option]
+      prev.includes(option)
+        ? prev.filter((item) => item !== option)
+        : [...prev, option]
     );
   };
 
@@ -142,7 +210,7 @@ if (data?.error) {
       case "multiselect":
         return (
           <>
-          {/* <Snackbar
+            {/* <Snackbar
   open={showError}
   autoHideDuration={4000}
   onClose={() => setShowError(false)}
@@ -180,15 +248,31 @@ if (data?.error) {
       case "signature":
         return (
           showSignature && (
-            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                width: "100%",
+              }}
+            >
               <SignatureCanvas
                 ref={sigCanvas}
                 penColor="black"
-                canvasProps={{ width: 500, height: 200, className: "sigCanvas" }}
+                canvasProps={{
+                  width: 500,
+                  height: 200,
+                  className: "sigCanvas",
+                }}
                 backgroundColor="#fff"
                 style={{ border: "1px solid #ccc", borderRadius: "10px" }}
               />
-              <Button variant="contained" onClick={handleSignatureSubmit} className="send-btn" sx={{ mt: 2 }}>
+              <Button
+                variant="contained"
+                onClick={handleSignatureSubmit}
+                className="send-btn"
+                sx={{ mt: 2 }}
+              >
                 Submit Signature
               </Button>
             </Box>
@@ -197,9 +281,17 @@ if (data?.error) {
       case "radio":
         return (
           <>
-            <RadioGroup value={selectedOption} onChange={(e) => setSelectedOption(e.target.value)}>
+            <RadioGroup
+              value={selectedOption}
+              onChange={(e) => setSelectedOption(e.target.value)}
+            >
               {currentQuestion.options?.map((opt, idx) => (
-                <FormControlLabel key={idx} value={opt} control={<Radio />} label={opt} />
+                <FormControlLabel
+                  key={idx}
+                  value={opt}
+                  control={<Radio />}
+                  label={opt}
+                />
               ))}
             </RadioGroup>
             <Button
@@ -224,7 +316,14 @@ if (data?.error) {
               className="input-message"
             />
             <button className="send-btn" onClick={handleSend}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <line x1="22" y1="2" x2="11" y2="13"></line>
                 <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
               </svg>
@@ -248,17 +347,25 @@ if (data?.error) {
           <div className="app-name">Attmosfire Chatbot</div>
         </div>
         <div className="header-icons">
-        {!setSessionStarted && (
-          <>
-          <IconButton className="icon-btn">📎</IconButton>
-          <IconButton className="icon-btn">🎤</IconButton>
-          </>
-        )}
+          {!sessionStarted && (
+            <>
+              <IconButton
+                className="icon-btn"
+                onClick={isRecording ? stopRecording : startRecording}
+              >
+                {isRecording ? "⏹️" : "🎤"}
+              </IconButton>
+            </>
+          )}
         </div>
       </div>
 
       <div className="chat-content" ref={contentRef}>
-        <input className="input-field" placeholder="Do you have question?" readOnly />
+        <input
+          className="input-field"
+          placeholder="Do you have question?"
+          readOnly
+        />
         {messages.map((msg, index) => (
           <motion.div
             key={index}
@@ -267,15 +374,38 @@ if (data?.error) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05, duration: 0.3 }}
           >
-            <div className={`avatar ${msg.role === "bot" ? "support-avatar" : ""}`}>
+            <div
+              className={`avatar ${msg.role === "bot" ? "support-avatar" : ""}`}
+            >
               {msg.role === "bot" ? "🤖" : "👤"}
             </div>
-            <div className="message-bubble">{msg.content}</div>
+            <div className="message-bubble">
+              {msg.type === "audio" ? (
+                <audio controls src={msg.audioUrl} />
+              ) : (
+                msg.content
+              )}
+            </div>
           </motion.div>
         ))}
       </div>
 
       <div className="chat-input">{renderInputArea()}</div>
+      {/* {showRecorder && (
+        <div style={{ marginTop: "10px", textAlign: "center" }}>
+          <VoiceRecorder
+            onAudioSubmit={(base64, audioURL) => {
+              setMessages((prev) => [
+                ...prev,
+                { role: "user", type: "audio", audioUrl: audioURL },
+              ]);
+
+              fetchFirstQuestion(null, base64);
+              setShowRecorder(false);
+            }}
+          />
+        </div>
+      )} */}
     </div>
   );
 };
