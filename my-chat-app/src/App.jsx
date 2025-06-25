@@ -249,7 +249,6 @@ const ChatApp = () => {
                     key={idx}
                     control={
                       <Checkbox
-                        className="custom-checkbox"
                         checked={selectedCheckboxes.includes(opt)}
                         onChange={() => handleCheckboxChange(opt)}
                       />
@@ -598,7 +597,7 @@ I’m here to assist you with your medical concerns.</p>
               </div>
               <div className="message-bubble">
                 {msg.type === "audio" ? (
-                  <audio controls src={msg.audioUrl} className="audio-player" />
+                  <audio controls src={msg.audioUrl} />
                 ) : msg.type === "signature" ? (
                   <img
                     src={msg.imageUrl}
