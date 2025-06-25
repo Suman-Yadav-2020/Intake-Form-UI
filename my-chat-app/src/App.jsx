@@ -303,10 +303,8 @@ const ChatApp = () => {
                 backgroundColor="#fff"
                 style={{ border: "1px solid #ccc", borderRadius: "10px" }}
               />
-               <button
-               
-               onClick={handleSignatureSubmit}
-              
+              <button
+                onClick={handleSignatureSubmit}
                 className="chat-send-button floating-chat-button"
               >
                 <svg
@@ -337,25 +335,24 @@ const ChatApp = () => {
         return (
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <Box>
-            <DatePicker
-              label="Select a date"
-              value={selectedDate}
-              onChange={(newValue) => setSelectedDate(newValue)}
-              format="MM/DD/YYYY" // 👈 ensures proper formatting and allows typing
-              slotProps={{
-                textField: {
-                  fullWidth: true,
-                  variant: "outlined",
-                  maxWidth: "80%",
-                },
-              }}
-            />
-</Box>
-             <Box>
+              <DatePicker
+                label="Select a date"
+                value={selectedDate}
+                onChange={(newValue) => setSelectedDate(newValue)}
+                format="MM/DD/YYYY" // 👈 ensures proper formatting and allows typing
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    variant: "outlined",
+                    maxWidth: "80%",
+                  },
+                }}
+              />
+            </Box>
+            <Box>
               <button
-               
-               onClick={() => handleSend(selectedDate?.format("YYYY-MM-DD"))}
-               disabled={!selectedDate}
+                onClick={() => handleSend(selectedDate?.format("YYYY-MM-DD"))}
+                disabled={!selectedDate}
                 className="chat-send-button floating-chat-button"
               >
                 <svg
@@ -574,9 +571,14 @@ const ChatApp = () => {
           <div className="chat-message-container">
             <div className="message-avatar message-avatar--bot">🤖</div>
             <div className="message-bubble message-bubble--bot">
-            <p> 👋 Hello and thank you for connecting with our telemedicine service.
-I’m here to assist you with your medical concerns.</p> 
-<p><b>How may I help you today?</b></p>
+              <p>
+                {" "}
+                👋 Hello and thank you for connecting with our telemedicine
+                service. I’m here to assist you with your medical concerns.
+              </p>
+              <p>
+                <b>How may I help you today?</b>
+              </p>
             </div>
           </div>
 
@@ -597,7 +599,9 @@ I’m here to assist you with your medical concerns.</p>
               </div>
               <div className="message-bubble">
                 {msg.type === "audio" ? (
+
                   <audio controls src={msg.audioUrl} className="audio-player"/>
+
                 ) : msg.type === "signature" ? (
                   <img
                     src={msg.imageUrl}
