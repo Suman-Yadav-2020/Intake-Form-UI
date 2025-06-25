@@ -242,7 +242,7 @@ if (data?.error) {
                 <FormControlLabel 
                   key={idx}
                   control={
-                    <Checkbox
+                    <Checkbox className="custom-checkbox"
                       checked={selectedCheckboxes.includes(opt)}
                       onChange={() => handleCheckboxChange(opt)}
                     />
@@ -469,7 +469,7 @@ if (data?.error) {
             </div>
             <div className="message-bubble">
               {msg.type === "audio" ? (
-                <audio controls src={msg.audioUrl} />
+                <audio className="audio-player" controls src={msg.audioUrl} />
               ) : (
                 msg.content
               )}
