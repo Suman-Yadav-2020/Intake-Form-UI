@@ -216,9 +216,6 @@ if (data?.error) {
       case "multiselect":
         return (
           <>
-
-
-
             <FormGroup className="flex">
               <Box>
               {currentQuestion.options?.map((opt, idx) => (
@@ -290,51 +287,80 @@ if (data?.error) {
             <RadioGroup
               value={selectedOption}
               onChange={(e) => setSelectedOption(e.target.value)}
-            >
+            ><Box>
               {currentQuestion.options?.map((opt, idx) => (
-                <FormControlLabel
+                <FormControlLabel className="custon-radio"
                   key={idx}
                   value={opt}
                   control={<Radio />}
                   label={opt}
                 />
               ))}
+              </Box>
             </RadioGroup>
-            <Button
-              variant="contained"
-              onClick={() => handleSend(selectedOption)}
+
+             <button
+              type="submit"
+                onClick={() => handleSend(selectedOption)}
               disabled={!selectedOption}
-              className="send-btn"
+            className="chat-send-button floating-chat-button"
             >
-              Submit
-            </Button>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+            </svg>
+            </button>
           </>
         );
       default:
         return (
-          <>
-            <TextField
-              fullWidth
-              variant="outlined"
-              placeholder="Type your answer..."
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              className="input-message"
-            />
-            <button className="send-btn" onClick={handleSend}>
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <line x1="22" y1="2" x2="11" y2="13"></line>
-                <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
-              </svg>
-            </button>
-          </>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      <TextField
+        fullWidth
+        placeholder="Type your answer..."
+        variant="outlined"
+        value={userInput}
+        onChange={(e) => setUserInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+          }
+        }}
+        className="input-message"
+        InputProps={{
+          endAdornment: (
+            <> {!sessionStarted && (
+              <IconButton onClick={isRecording ? stopRecording : startRecording}>
+                {isRecording ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" fill="#f44336">
+                    <path d="M12 14q-1.25 0-2.125-.875T9 11V5q0-1.25.875-2.125T12 2q1.25 0 2.125.875T15 5v6q0 1.25-.875 2.125T12 14Zm-1 7v-3.1q-2.875-.35-4.938-2.5Q4 13.25 4 10h2q0 2.5 1.75 4.25T12 16q2.5 0 4.25-1.75T18 10h2q0 3.25-2.063 5.4Q15.875 17.55 13 17.9V21Z"/>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" fill="#8b5cf6">
+                    <path d="M12 14q-1.25 0-2.125-.875T9 11V5q0-1.25.875-2.125T12 2q1.25 0 2.125.875T15 5v6q0 1.25-.875 2.125T12 14Zm-1 7v-3.1q-2.875-.35-4.938-2.5Q4 13.25 4 10h2q0 2.5 1.75 4.25T12 16q2.5 0 4.25-1.75T18 10h2q0 3.25-2.063 5.4Q15.875 17.55 13 17.9V21Z"/>
+                  </svg>
+                )}
+              </IconButton>
+            )}
+              <IconButton onClick={handleSend} className="chat-send-button" >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="2"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+                </svg>
+              </IconButton>
+            </>
+          ),
+        }}
+      />
+    </Box>
         );
     }
   };
@@ -365,16 +391,7 @@ if (data?.error) {
           <div className="app-name">BTC Chatbot</div>
         </div>
         <div className="header-icons">
-          {!sessionStarted && (
-            <>
-              <IconButton
-                className="icon-btn"
-                onClick={isRecording ? stopRecording : startRecording}
-              >
-                {isRecording ? "⏹️" : "🎤"}
-              </IconButton>
-            </>
-          )}
+  
         </div>
       </div>
 
@@ -384,7 +401,7 @@ if (data?.error) {
         <div className="chat-message-container">
               <div className="message-avatar message-avatar--bot">🤖</div>
               <div className="message-bubble message-bubble--bot">
-                👋 Hello! I'm your Smart Intake Bot. I can help you with legal consultations, document reviews, and more. What can I assist you with today?
+                👋 Hello! I'm your Smart Intake Bot. I can help you, What can I assist you with today?
               </div>
             </div>
 
