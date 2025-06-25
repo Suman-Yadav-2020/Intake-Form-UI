@@ -34,12 +34,32 @@ const ChatApp = () => {
 const [showError, setShowError] = useState(false);
 const [errorMessage, setErrorMessage] = useState("");
  const [showRecorder, setShowRecorder] = useState(false);
-
+const [isMaximized, setIsMaximized] = useState(false);
 
   const [isRecording, setIsRecording] = useState(false);
   const recorderRef = useRef(null);
   const streamRef = useRef(null);
 
+
+    const [isOpen, setIsOpen] = useState(false);
+  const [showPulse, setShowPulse] = useState(false);
+  const btnIconRef = useRef(null);
+
+  // Pulse animation logic
+  useEffect(() => {
+    const pulseTimer = setInterval(() => {
+      if (!isOpen) {
+        setShowPulse(true);
+      }
+    }, 5000);
+
+    return () => clearInterval(pulseTimer);
+  }, [isOpen]);
+
+  const toggleChat = () => {
+    setIsOpen((prev) => !prev);
+    setShowPulse(false);
+  };
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -384,14 +404,43 @@ if (data?.error) {
   </Alert>
 </Snackbar>
    
-    <div className="chat-container active">
+   <div
+        id="chatToggle"
+        onClick={toggleChat}
+        className={`chat-toggle-btn ${isOpen ? "close" : ""} ${showPulse ? "pulse" : ""}`}
+      >
+        <span className="btn-icon" ref={btnIconRef}>
+          {isOpen ? "✕" : "💬"}
+        </span>
+      </div>
+
+  <div
+  id="chatContainer"
+  className={`chat-container ${isOpen ? "active" : ""} ${isMaximized ? "maximized" : ""}`}
+>
+
       <div className="chat-header">
         <div className="logo-section">
           <div className="logo">AI</div>
           <div className="app-name">BTC Chatbot</div>
         </div>
         <div className="header-icons">
-  
+
+   <IconButton onClick={() => setIsMaximized((prev) => !prev)}>
+  {isMaximized ? (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
+  <path d="M15 4h5v5M9 20H4v-5M20 15v5h-5M4 9V4h5" />
+</svg>
+
+  ) : (
+   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
+  <path d="M4 4h6v2H6v4H4V4zM20 4v6h-2V6h-4V4h6zM4 20v-6h2v4h4v2H4zM20 20h-6v-2h4v-4h2v6z" />
+</svg>
+
+  )}
+</IconButton>
+
+
         </div>
       </div>
 
