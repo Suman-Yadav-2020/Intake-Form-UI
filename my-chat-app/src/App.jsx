@@ -599,7 +599,9 @@ const ChatApp = () => {
               </div>
               <div className="message-bubble">
                 {msg.type === "audio" ? (
-                  <audio controls src={msg.audioUrl} />
+
+                  <audio controls src={msg.audioUrl} className="audio-player"/>
+
                 ) : msg.type === "signature" ? (
                   <img
                     src={msg.imageUrl}
