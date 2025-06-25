@@ -334,3 +334,8 @@ input:focus {
     left: 2.5vw !important;
   }
 }
+
+.toster-message {
+  top: 2%;
+  display: inline-block !important;
+}
