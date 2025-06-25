@@ -14,10 +14,13 @@ import {
 import { motion } from "framer-motion";
 import SignatureCanvas from "react-signature-canvas";
 import { Snackbar, Alert } from "@mui/material";
-import "./App.css"; 
+import "./App.css";
 import VoiceRecorder from "./VoiceRecorder";
 import RecordRTC from "recordrtc";
-
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs from "dayjs";
 
 const ChatApp = () => {
   const [messages, setMessages] = useState([]);
@@ -30,18 +33,18 @@ const ChatApp = () => {
   const sigCanvas = useRef();
   const contentRef = useRef();
   const [currentPhase, setCurrentPhase] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
 
-const [showError, setShowError] = useState(false);
-const [errorMessage, setErrorMessage] = useState("");
- const [showRecorder, setShowRecorder] = useState(false);
-const [isMaximized, setIsMaximized] = useState(false);
+  const [showError, setShowError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [showRecorder, setShowRecorder] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   const [isRecording, setIsRecording] = useState(false);
   const recorderRef = useRef(null);
   const streamRef = useRef(null);
 
-
-    const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [showPulse, setShowPulse] = useState(false);
   const btnIconRef = useRef(null);
 
@@ -169,12 +172,11 @@ const [isMaximized, setIsMaximized] = useState(false);
 
       const data = await res.json();
 
-if (data?.error) {
-  // alert(data.error);
-  setErrorMessage(data.error);
-  setShowError(true);
-}
-
+      if (data?.error) {
+        // alert(data.error);
+        setErrorMessage(data.error);
+        setShowError(true);
+      }
 
       if (data?.next_question) {
         setCurrentQuestion(data.next_question);
@@ -208,17 +210,21 @@ if (data?.error) {
     setUserInput("");
     setSelectedOption("");
     setSelectedCheckboxes([]);
+    setSelectedDate(null);
+    setCurrentQuestion(null);
   };
 
   const handleSignatureSubmit = () => {
     if (sigCanvas.current) {
+      const signatureDataURL = sigCanvas.current.toDataURL();
       setMessages((prev) => [
         ...prev,
-        { role: "user", content: "[Signature submitted]" },
+        { role: "user", type: "signature", imageUrl: signatureDataURL },
       ]);
-      fetchNextQuestion("[Signature submitted]");
+      fetchNextQuestion("User submitted a signature.");
       sigCanvas.current.clear();
       setShowSignature(false);
+      setCurrentQuestion(null);
     }
   };
 
@@ -238,33 +244,40 @@ if (data?.error) {
           <>
             <FormGroup className="flex">
               <Box>
-              {currentQuestion.options?.map((opt, idx) => (
-                <FormControlLabel 
-                  key={idx}
-                  control={
-                    <Checkbox
-                      checked={selectedCheckboxes.includes(opt)}
-                      onChange={() => handleCheckboxChange(opt)}
-                    />
-                  }
-                  label={opt}
-                />
-              ))}
+                {currentQuestion.options?.map((opt, idx) => (
+                  <FormControlLabel
+                    key={idx}
+                    control={
+                      <Checkbox
+                        checked={selectedCheckboxes.includes(opt)}
+                        onChange={() => handleCheckboxChange(opt)}
+                      />
+                    }
+                    label={opt}
+                  />
+                ))}
               </Box>
             </FormGroup>
 
- <Box>
-            <button
-              type="submit"
-              onClick={() => handleSend(selectedCheckboxes.join(", "))}
-              disabled={selectedCheckboxes.length === 0}
-            className="chat-send-button floating-chat-button"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
-            </svg>
-            </button>
+            <Box>
+              <button
+                type="submit"
+                onClick={() => handleSend(selectedCheckboxes.join(", "))}
+                disabled={selectedCheckboxes.length === 0}
+                className="chat-send-button floating-chat-button"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+                </svg>
+              </button>
             </Box>
           </>
         );
@@ -301,86 +314,138 @@ if (data?.error) {
             </Box>
           )
         );
+      case "date":
+        return (
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <DatePicker
+              label="Select a date"
+              value={selectedDate}
+              onChange={(newValue) => setSelectedDate(newValue)}
+              format="MM/DD/YYYY" // 👈 ensures proper formatting and allows typing
+              slotProps={{
+                textField: {
+                  fullWidth: true,
+                  variant: "outlined",
+                },
+              }}
+            />
+            <Button
+              variant="contained"
+              onClick={() => handleSend(selectedDate?.format("YYYY-MM-DD"))}
+              disabled={!selectedDate}
+              className="send-btn"
+              sx={{ mt: 2 }}
+            >
+              Submit Date
+            </Button>
+          </LocalizationProvider>
+        );
       case "radio":
         return (
           <>
             <RadioGroup
               value={selectedOption}
               onChange={(e) => setSelectedOption(e.target.value)}
-            ><Box>
-              {currentQuestion.options?.map((opt, idx) => (
-                <FormControlLabel className="custon-radio"
-                  key={idx}
-                  value={opt}
-                  control={<Radio />}
-                  label={opt}
-                />
-              ))}
+            >
+              <Box>
+                {currentQuestion.options?.map((opt, idx) => (
+                  <FormControlLabel
+                    className="custon-radio"
+                    key={idx}
+                    value={opt}
+                    control={<Radio />}
+                    label={opt}
+                  />
+                ))}
               </Box>
             </RadioGroup>
 
-             <button
+            <button
               type="submit"
-                onClick={() => handleSend(selectedOption)}
+              onClick={() => handleSend(selectedOption)}
               disabled={!selectedOption}
-            className="chat-send-button floating-chat-button"
+              className="chat-send-button floating-chat-button"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
-            </svg>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+              </svg>
             </button>
           </>
         );
       default:
         return (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-      <TextField
-        fullWidth
-        placeholder="Type your answer..."
-        variant="outlined"
-        value={userInput}
-        onChange={(e) => setUserInput(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSend();
-          }
-        }}
-        className="input-message"
-        InputProps={{
-          endAdornment: (
-            <> {!sessionStarted && (
-              <IconButton onClick={isRecording ? stopRecording : startRecording}>
-                {isRecording ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" fill="#f44336">
-                    <path d="M12 14q-1.25 0-2.125-.875T9 11V5q0-1.25.875-2.125T12 2q1.25 0 2.125.875T15 5v6q0 1.25-.875 2.125T12 14Zm-1 7v-3.1q-2.875-.35-4.938-2.5Q4 13.25 4 10h2q0 2.5 1.75 4.25T12 16q2.5 0 4.25-1.75T18 10h2q0 3.25-2.063 5.4Q15.875 17.55 13 17.9V21Z"/>
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" fill="#8b5cf6">
-                    <path d="M12 14q-1.25 0-2.125-.875T9 11V5q0-1.25.875-2.125T12 2q1.25 0 2.125.875T15 5v6q0 1.25-.875 2.125T12 14Zm-1 7v-3.1q-2.875-.35-4.938-2.5Q4 13.25 4 10h2q0 2.5 1.75 4.25T12 16q2.5 0 4.25-1.75T18 10h2q0 3.25-2.063 5.4Q15.875 17.55 13 17.9V21Z"/>
-                  </svg>
-                )}
-              </IconButton>
-            )}
-              <IconButton onClick={handleSend} className="chat-send-button" >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#fff"
-                  strokeWidth="2"
-                >
-                  <line x1="22" y1="2" x2="11" y2="13"></line>
-                  <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
-                </svg>
-              </IconButton>
-            </>
-          ),
-        }}
-      />
-    </Box>
+            <TextField
+              fullWidth
+              placeholder="Type your answer..."
+              variant="outlined"
+              value={userInput}
+              onChange={(e) => setUserInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              className="input-message"
+              InputProps={{
+                endAdornment: (
+                  <>
+                    {" "}
+                    {!sessionStarted && (
+                      <IconButton
+                        onClick={isRecording ? stopRecording : startRecording}
+                      >
+                        {isRecording ? (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            height="24"
+                            width="24"
+                            fill="#f44336"
+                          >
+                            <path d="M12 14q-1.25 0-2.125-.875T9 11V5q0-1.25.875-2.125T12 2q1.25 0 2.125.875T15 5v6q0 1.25-.875 2.125T12 14Zm-1 7v-3.1q-2.875-.35-4.938-2.5Q4 13.25 4 10h2q0 2.5 1.75 4.25T12 16q2.5 0 4.25-1.75T18 10h2q0 3.25-2.063 5.4Q15.875 17.55 13 17.9V21Z" />
+                          </svg>
+                        ) : (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            height="24"
+                            width="24"
+                            fill="#8b5cf6"
+                          >
+                            <path d="M12 14q-1.25 0-2.125-.875T9 11V5q0-1.25.875-2.125T12 2q1.25 0 2.125.875T15 5v6q0 1.25-.875 2.125T12 14Zm-1 7v-3.1q-2.875-.35-4.938-2.5Q4 13.25 4 10h2q0 2.5 1.75 4.25T12 16q2.5 0 4.25-1.75T18 10h2q0 3.25-2.063 5.4Q15.875 17.55 13 17.9V21Z" />
+                          </svg>
+                        )}
+                      </IconButton>
+                    )}
+                    <IconButton
+                      onClick={handleSend}
+                      className="chat-send-button"
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#fff"
+                        strokeWidth="2"
+                      >
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+                      </svg>
+                    </IconButton>
+                  </>
+                ),
+              }}
+            />
+          </Box>
         );
     }
   };
@@ -393,93 +458,122 @@ if (data?.error) {
 
   return (
     <>
-              <Snackbar className="toster-message"
-  open={showError}
-  autoHideDuration={400000000}
-  onClose={() => setShowError(false)}
-  anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
->
-  <Alert severity="error" onClose={() => setShowError(false)} sx={{ width: "100%" }}>
-    {errorMessage}
-  </Alert>
-</Snackbar>
-   
-   <div
+      <Snackbar
+        className="toster-message"
+        open={showError}
+        autoHideDuration={400000000}
+        onClose={() => setShowError(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity="error"
+          onClose={() => setShowError(false)}
+          sx={{ width: "100%" }}
+        >
+          {errorMessage}
+        </Alert>
+      </Snackbar>
+
+      <div
         id="chatToggle"
         onClick={toggleChat}
-        className={`chat-toggle-btn ${isOpen ? "close" : ""} ${showPulse ? "pulse" : ""}`}
+        className={`chat-toggle-btn ${isOpen ? "close" : ""} ${
+          showPulse ? "pulse" : ""
+        }`}
       >
         <span className="btn-icon" ref={btnIconRef}>
           {isOpen ? "✕" : "💬"}
         </span>
       </div>
 
-  <div
-  id="chatContainer"
-  className={`chat-container ${isOpen ? "active" : ""} ${isMaximized ? "maximized" : ""}`}
->
-
-      <div className="chat-header">
-        <div className="logo-section">
-          <div className="logo">AI</div>
-          <div className="app-name">BTC Chatbot</div>
-        </div>
-        <div className="header-icons">
-
-   <IconButton onClick={() => setIsMaximized((prev) => !prev)}>
-  {isMaximized ? (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
-  <path d="M15 4h5v5M9 20H4v-5M20 15v5h-5M4 9V4h5" />
-</svg>
-
-  ) : (
-   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
-  <path d="M4 4h6v2H6v4H4V4zM20 4v6h-2V6h-4V4h6zM4 20v-6h2v4h4v2H4zM20 20h-6v-2h4v-4h2v6z" />
-</svg>
-
-  )}
-</IconButton>
-
-
-        </div>
-      </div>
-
-      <div className="chat-content" ref={contentRef}>
-
-        {/* <input className="input-field" placeholder="Welcome to Attmosfire!" readOnly /> */}
-        <div className="chat-message-container">
-              <div className="message-avatar message-avatar--bot">🤖</div>
-              <div className="message-bubble message-bubble--bot">
-                👋 Hello! I'm your Smart Intake Bot. I can help you, What can I assist you with today?
-              </div>
-            </div>
-
-        {messages.map((msg, index) => (
-          <motion.div
-            key={index}
-            className={`message ${msg.role === "bot" ? "support" : "user"}`}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05, duration: 0.3 }}
-          >
-            <div
-              className={`avatar ${msg.role === "bot" ? "support-avatar" : ""}`}
-            >
-              {msg.role === "bot" ? "🤖" : "👤"}
-            </div>
-            <div className="message-bubble">
-              {msg.type === "audio" ? (
-                <audio controls src={msg.audioUrl} />
+      <div
+        id="chatContainer"
+        className={`chat-container ${isOpen ? "active" : ""} ${
+          isMaximized ? "maximized" : ""
+        }`}
+      >
+        <div className="chat-header">
+          <div className="logo-section">
+            <div className="logo">AI</div>
+            <div className="app-name">BTC Chatbot</div>
+          </div>
+          <div className="header-icons">
+            <IconButton onClick={() => setIsMaximized((prev) => !prev)}>
+              {isMaximized ? (
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="2"
+                >
+                  <path d="M15 4h5v5M9 20H4v-5M20 15v5h-5M4 9V4h5" />
+                </svg>
               ) : (
-                msg.content
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="2"
+                >
+                  <path d="M4 4h6v2H6v4H4V4zM20 4v6h-2V6h-4V4h6zM4 20v-6h2v4h4v2H4zM20 20h-6v-2h4v-4h2v6z" />
+                </svg>
               )}
-            </div>
-          </motion.div>
-        ))}
-      </div>
+            </IconButton>
+          </div>
+        </div>
 
-      <div className="chat-input">{renderInputArea()}</div>
-      {/* {showRecorder && (
+        <div className="chat-content" ref={contentRef}>
+          {/* <input className="input-field" placeholder="Welcome to Attmosfire!" readOnly /> */}
+          <div className="chat-message-container">
+            <div className="message-avatar message-avatar--bot">🤖</div>
+            <div className="message-bubble message-bubble--bot">
+              👋 Hello! I'm your Smart Intake Bot. I can help you, What can I
+              assist you with today?
+            </div>
+          </div>
+
+          {messages.map((msg, index) => (
+            <motion.div
+              key={index}
+              className={`message ${msg.role === "bot" ? "support" : "user"}`}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05, duration: 0.3 }}
+            >
+              <div
+                className={`avatar ${
+                  msg.role === "bot" ? "support-avatar" : ""
+                }`}
+              >
+                {msg.role === "bot" ? "🤖" : "👤"}
+              </div>
+              <div className="message-bubble">
+                {msg.type === "audio" ? (
+                  <audio controls src={msg.audioUrl} />
+                ) : msg.type === "signature" ? (
+                  <img
+                    src={msg.imageUrl}
+                    alt="User Signature"
+                    style={{
+                      maxWidth: "100%",
+                      border: "1px solid #ccc",
+                      borderRadius: "5px",
+                    }}
+                  />
+                ) : (
+                  msg.content
+                )}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="chat-input">{renderInputArea()}</div>
+        {/* {showRecorder && (
         <div style={{ marginTop: "10px", textAlign: "center" }}>
           <VoiceRecorder
             onAudioSubmit={(base64, audioURL) => {
@@ -494,8 +588,8 @@ if (data?.error) {
           />
         </div>
       )} */}
-    </div>
-     </>
+      </div>
+    </>
   );
 };
 
