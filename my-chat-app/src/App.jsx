@@ -13,7 +13,9 @@ import {
 } from "@mui/material";
 import { motion } from "framer-motion";
 import SignatureCanvas from "react-signature-canvas";
-import "./App.css"; // 👈 Your reference CSS
+import "./App.css"; // 
+import { Snackbar, Alert } from "@mui/material";
+
 
 const ChatApp = () => {
   const [messages, setMessages] = useState([]);
@@ -26,8 +28,8 @@ const ChatApp = () => {
   const sigCanvas = useRef();
   const contentRef = useRef();
   const [currentPhase, setCurrentPhase] = useState(null);
-// const [showError, setShowError] = useState(false);
-// const [errorMessage, setErrorMessage] = useState("");
+const [showError, setShowError] = useState(false);
+const [errorMessage, setErrorMessage] = useState("");
 
 
   const fetchFirstQuestion = async (userInitInput ,voiceAnswer) => {
@@ -80,9 +82,9 @@ const ChatApp = () => {
 
       const data = await res.json();
 if (data?.error) {
-  alert(data.error);
-  // setErrorMessage(data.error);
-  // setShowError(true);
+  // alert(data.error);
+  setErrorMessage(data.error);
+  setShowError(true);
 }
 
       if (data?.next_question) {
@@ -142,20 +144,12 @@ if (data?.error) {
       case "multiselect":
         return (
           <>
-          {/* <Snackbar
-  open={showError}
-  autoHideDuration={4000}
-  onClose={() => setShowError(false)}
-  anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
->
-  <Alert severity="error" onClose={() => setShowError(false)} sx={{ width: "100%" }}>
-    {errorMessage}
-  </Alert>
-</Snackbar> */}
 
-            <FormGroup>
+
+            <FormGroup className="flex">
+              <Box>
               {currentQuestion.options?.map((opt, idx) => (
-                <FormControlLabel
+                <FormControlLabel 
                   key={idx}
                   control={
                     <Checkbox
@@ -166,15 +160,22 @@ if (data?.error) {
                   label={opt}
                 />
               ))}
+              </Box>
             </FormGroup>
-            <Button
-              variant="contained"
+
+ <Box>
+            <button
+              type="submit"
               onClick={() => handleSend(selectedCheckboxes.join(", "))}
               disabled={selectedCheckboxes.length === 0}
-              className="send-btn"
+            className="chat-send-button floating-chat-button"
             >
-              Submit
-            </Button>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+            </svg>
+            </button>
+            </Box>
           </>
         );
       case "signature":
@@ -241,11 +242,23 @@ if (data?.error) {
   }, [messages]);
 
   return (
+    <>
+              <Snackbar className="toster-message"
+  open={showError}
+  autoHideDuration={400000000}
+  onClose={() => setShowError(false)}
+  anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+>
+  <Alert severity="error" onClose={() => setShowError(false)} sx={{ width: "100%" }}>
+    {errorMessage}
+  </Alert>
+</Snackbar>
+   
     <div className="chat-container active">
       <div className="chat-header">
         <div className="logo-section">
-          <div className="logo">A</div>
-          <div className="app-name">Attmosfire Chatbot</div>
+          <div className="logo">AI</div>
+          <div className="app-name">BTC Chatbot</div>
         </div>
         <div className="header-icons">
         {!setSessionStarted && (
@@ -258,7 +271,13 @@ if (data?.error) {
       </div>
 
       <div className="chat-content" ref={contentRef}>
-        <input className="input-field" placeholder="Do you have question?" readOnly />
+        {/* <input className="input-field" placeholder="Welcome to Attmosfire!" readOnly /> */}
+        <div className="chat-message-container">
+              <div className="message-avatar message-avatar--bot">🤖</div>
+              <div className="message-bubble message-bubble--bot">
+                👋 Hello! I'm your Smart Intake Bot. I can help you with legal consultations, document reviews, and more. What can I assist you with today?
+              </div>
+            </div>
         {messages.map((msg, index) => (
           <motion.div
             key={index}
@@ -277,6 +296,7 @@ if (data?.error) {
 
       <div className="chat-input">{renderInputArea()}</div>
     </div>
+     </>
   );
 };
 
