@@ -303,33 +303,73 @@ const ChatApp = () => {
                 backgroundColor="#fff"
                 style={{ border: "1px solid #ccc", borderRadius: "10px" }}
               />
-              <Button
+              <button
+                onClick={handleSignatureSubmit}
+                className="chat-send-button floating-chat-button"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+                </svg>
+              </button>
+
+              {/* <Button
                 variant="contained"
                 onClick={handleSignatureSubmit}
                 className="send-btn"
                 sx={{ mt: 2 }}
               >
                 Submit Signature
-              </Button>
+              </Button> */}
             </Box>
           )
         );
       case "date":
         return (
           <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <DatePicker
-              label="Select a date"
-              value={selectedDate}
-              onChange={(newValue) => setSelectedDate(newValue)}
-              format="MM/DD/YYYY" // 👈 ensures proper formatting and allows typing
-              slotProps={{
-                textField: {
-                  fullWidth: true,
-                  variant: "outlined",
-                },
-              }}
-            />
-            <Button
+            <Box>
+              <DatePicker
+                label="Select a date"
+                value={selectedDate}
+                onChange={(newValue) => setSelectedDate(newValue)}
+                format="MM/DD/YYYY" // 👈 ensures proper formatting and allows typing
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    variant: "outlined",
+                    maxWidth: "80%",
+                  },
+                }}
+              />
+            </Box>
+            <Box>
+              <button
+                onClick={() => handleSend(selectedDate?.format("YYYY-MM-DD"))}
+                disabled={!selectedDate}
+                className="chat-send-button floating-chat-button"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+                </svg>
+              </button>
+            </Box>
+
+            {/* <Button
               variant="contained"
               onClick={() => handleSend(selectedDate?.format("YYYY-MM-DD"))}
               disabled={!selectedDate}
@@ -337,7 +377,7 @@ const ChatApp = () => {
               sx={{ mt: 2 }}
             >
               Submit Date
-            </Button>
+            </Button> */}
           </LocalizationProvider>
         );
       case "radio":
@@ -495,7 +535,7 @@ const ChatApp = () => {
         <div className="chat-header">
           <div className="logo-section">
             <div className="logo">AI</div>
-            <div className="app-name">BTC Chatbot</div>
+            <div className="app-name">IntakeGenie</div>
           </div>
           <div className="header-icons">
             <IconButton onClick={() => setIsMaximized((prev) => !prev)}>
@@ -531,8 +571,14 @@ const ChatApp = () => {
           <div className="chat-message-container">
             <div className="message-avatar message-avatar--bot">🤖</div>
             <div className="message-bubble message-bubble--bot">
-              👋 Hello! I'm your Smart Intake Bot. I can help you, What can I
-              assist you with today?
+              <p>
+                {" "}
+                👋 Hello and thank you for connecting with our telemedicine
+                service. I’m here to assist you with your medical concerns.
+              </p>
+              <p>
+                <b>How may I help you today?</b>
+              </p>
             </div>
           </div>
 
