@@ -371,3 +371,19 @@ input:focus {
   right: 30%;
   position: relative;
 }
+
+.MuiPickersSectionList-root {
+  padding: 12px 0px;
+  font-size: 14px;
+}
+.MuiInputLabel-root.Mui-focused {
+  color: #8b5cf6 !important;
+}
+
+.MuiPickersOutlinedInput-notchedOutline {
+  border-color: #8b5cf6 !important;
+}
+
+.MuiPickersTextField-root {
+  max-width: 80% !important;
+}
